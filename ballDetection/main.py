@@ -9,6 +9,7 @@ import argparse
 import cv2
 import imutils
 import time
+import colorsys
 
 # settings Arduino serial port
 ArduinoSerial = serial.Serial('com5', 115200)
@@ -24,16 +25,13 @@ args = vars(ap.parse_args())
 # define the lower and upper boundaries of the "red"
 # ball in the HSV color space, then initialize the
 # list of tracked points
-redLower = (0, 0, 250)
-redUpper = (255, 5, 255)
+redLower = (5, 100, 0)
+redUpper = (17, 255, 220)
 pts = deque(maxlen=args["buffer"])
 # if a video path was not supplied, grab the reference
 # to the webcam
-if not args.get("video", False):
-    vs = VideoStream(src=0).start()
-# otherwise, grab a reference to the video file
-else:
-    vs = cv2.VideoCapture(args["video"])
+vs = VideoStream(src=0).start()
+
 # allow the camera or video file to warm up
 time.sleep(2.0)
 
@@ -43,13 +41,14 @@ while True:
     frame = vs.read()
     # handle the frame from VideoCapture or VideoStream
     frame = frame[1] if args.get("video", False) else frame
+    frame = frame[0:510, 70:580].copy()
     # if we are viewing a video and we did not grab a frame,
     # then we have reached the end of the video
     if frame is None:
         break
     # resize the frame, blur it, and convert it to the HSV
     # color space
-    frame = imutils.resize(frame, width=1000)
+    # frame = imutils.resize(frame, width=1000)
     blurred = cv2.GaussianBlur(frame, (11, 11), 0)
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
     # construct a mask for the color "green", then perform
@@ -58,7 +57,7 @@ while True:
     mask = cv2.inRange(hsv, redLower, redUpper)
     mask = cv2.erode(mask, None, iterations=2)
     mask = cv2.dilate(mask, None, iterations=2)
-
+    cv2.imshow("MASK", mask)
     # find contours in the mask and initialize the current
     # (x, y) center of the ball
     cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
@@ -96,7 +95,7 @@ while True:
         if center is not None:
             ballCordinate = str(center[0]) + ',' + str(center[1]) + '\n'
             ArduinoSerial.write(ballCordinate.encode('utf-8'))
-            print(center[0])
+            print(ballCordinate)
 
     # show the frame to our screen
     cv2.imshow("Frame", frame)
